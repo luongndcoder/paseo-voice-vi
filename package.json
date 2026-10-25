@@ -1,0 +1,19 @@
+{
+  "name": "paseo-voice-vi",
+  "version": "0.1.0",
+  "description": "Standalone Vietnamese dictation STT worker for Paseo (sherpa-onnx Nemotron streaming, speaks the Paseo local-speech worker protocol over IPC).",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=23.6"
+  },
+  "bin": {
+    "paseo-voice-vi-worker": "bin/worker.mjs",
+    "paseo-voice-vi-download": "scripts/download-model.mjs",
+    "paseo-voice-vi-doctor": "scripts/doctor.mjs",
+    "paseo-voice-vi-smoke-test": "scripts/smoke-test.mjs"
+  },
+  "dependencies": {
+    "sherpa-onnx-node": "^1.13.8"
+  }
+}
