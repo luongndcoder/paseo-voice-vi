@@ -148,6 +148,48 @@ export async function selfTestOperation(update: (message: string) => void): Prom
   }
 }
 
+/**
+ * Best-effort daemon version detection. The plugin subprocess is forked from
+ * <daemon>/dist/server/plugins/plugin-process.{js,ts}, so walking up from
+ * argv[1] finds the daemon's package.json. Returns null when unreadable.
+ */
+function readDaemonVersion(): string | null {
+  try {
+    const childPath = process.argv[1];
+    if (!childPath) return null;
+    let dir = path.dirname(childPath);
+    for (let i = 0; i < 8; i++) {
+      try {
+        const pkg = JSON.parse(readFileSync(path.join(dir, "package.json"), "utf8")) as {
+          name?: unknown;
+          version?: unknown;
+        };
+        if (pkg?.name === "@getpaseo/server" && typeof pkg.version === "string") {
+          return pkg.version;
+        }
+      } catch {
+        // keep walking up
+      }
+      const parent = path.dirname(dir);
+      if (parent === dir) break;
+      dir = parent;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
+function daemonSupportsExternalDictation(): { ok: boolean; version: string | null } {
+  const version = readDaemonVersion();
+  if (!version) return { ok: true, version };
+  const match = version.trim().match(/^(\d+)\.(\d+)\.(\d+)/);
+  if (!match) return { ok: true, version };
+  const major = Number(match[1]);
+  const minor = Number(match[2]);
+  return { ok: major > 0 || minor >= 13, version };
+}
+
 export interface ApplyConfigResult {
   configPath: string;
   backupPath: string;
@@ -155,6 +197,15 @@ export interface ApplyConfigResult {
 }
 
 export async function applyDictationConfigOperation(language: string): Promise<ApplyConfigResult> {
+  const support = daemonSupportsExternalDictation();
+  if (!support.ok) {
+    throw new Error(
+      `This daemon (${support.version ?? "unknown version"}) does not support external dictation ` +
+        `(needs a Paseo fork with stt.provider "external", 0.13+). ` +
+        `Upgrade the daemon instead of editing the config: a stock daemon rejects this file and ` +
+        `blocks its own config management until the external block is removed by hand.`,
+    );
+  }
   const { workerPath } = requirePluginWorker();
   const home = resolvePaseoHome();
   const configPath = resolveConfigPath(home);
