@@ -3,7 +3,7 @@ import { z } from "zod";
 
 export const PLUGIN_ID = "paseo-voice-vi";
 export const WORKER_FILE_NAME = "worker.mjs";
-export const MODEL_ID = "nemotron-3.5-560ms-int8";
+export const MODEL_ID = "nghiasr-vi-en-codeswitch-streaming";
 
 export const JobSchema = z.object({
   id: z.string(),

@@ -1,7 +1,7 @@
 # paseo-voice-vi
 
-Standalone Vietnamese dictation (ASR/STT) cho Paseo — gói riêng, cài được trên bất kỳ laptop
-nào mà không cần dùng daemon fork. Chạy sherpa-onnx Nemotron streaming ASR on-device
+Standalone Vietnamese-English codeswitch dictation (ASR/STT) cho Paseo — gói riêng, cài được trên bất kỳ laptop
+nào mà không cần dùng daemon fork. Chạy sherpa-onnx Zipformer streaming ASR on-device (model nghiasr-vi-en-codeswitch, ~75 MB)
 (offline, microphone → text ngay trên máy) và nói chuyện với daemon Paseo qua worker
 protocol có sẵn.
 
@@ -16,7 +16,7 @@ Paseo daemon  ──fork IPC (local-speech worker protocol)──▶  paseo-voic
 ```
 
 Daemon chỉ cần biết **provider `external` + đường dẫn worker module**; toàn bộ phần ASR
-(model tiếng Việt, sherpa-onnx, streaming) nằm trong gói này. Gói dùng cùng một models dir
+(model vi-en codeswitch, sherpa-onnx, streaming) nằm trong gói này. Gói dùng cùng một models dir
 với daemon nên model tải về dùng chung.
 
 ## Yêu cầu

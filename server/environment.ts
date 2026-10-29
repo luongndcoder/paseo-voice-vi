@@ -87,26 +87,37 @@ export function resolveModelsDir(home: string, config: DaemonConfigShape | null)
 }
 
 function hasModelFiles(directory: string): boolean {
-  return ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"].every(
-    (name) => {
-      try {
-        const stat = statSync(path.join(directory, name));
-        return stat.isFile() && stat.size > 0;
-      } catch {
-        return false;
-      }
-    },
-  );
+  // The codeswitch trial model ships symlinks; statSync follows them.
+  // Decoder is fp32 (decoder.onnx), encoder/joiner are int8.
+  const encoderOk = ["encoder.int8.onnx", "encoder.onnx"].some((name) => isNonEmptyFile(directory, name));
+  const decoderOk = ["decoder.onnx", "decoder.int8.onnx"].some((name) => isNonEmptyFile(directory, name));
+  const joinerOk = ["joiner.int8.onnx", "joiner.onnx"].some((name) => isNonEmptyFile(directory, name));
+  return encoderOk && decoderOk && joinerOk && isNonEmptyFile(directory, "tokens.txt");
+}
+
+function isNonEmptyFile(directory: string, name: string): boolean {
+  try {
+    const stat = statSync(path.join(directory, name));
+    return stat.isFile() && stat.size > 0;
+  } catch {
+    return false;
+  }
 }
 
 export function findInstalledModelDirectory(modelsDir: string): string | null {
   const candidates = [
+    // meeting-minutes project copies (dev + bundled sidecar resources).
+    "/Users/luongcoder/Documents/AI/meeting-minutes/src-python/models/local",
+    "/Users/luongcoder/Documents/AI/meeting-minutes/src-tauri/resources/models/local",
+    path.join(os.homedir(), "Documents/AI/meeting-minutes/src-python/models/local"),
     path.join(modelsDir, MODEL_ID),
     path.join(os.homedir(), ".paseo", "models", "local-speech", MODEL_ID),
     path.join(os.homedir(), ".voicescribe", "models", MODEL_ID),
   ];
   for (const candidate of candidates) {
-    if (hasModelFiles(candidate)) return candidate;
+    const dir =
+      path.basename(candidate) === MODEL_ID ? candidate : path.join(candidate, MODEL_ID);
+    if (hasModelFiles(dir)) return dir;
   }
   return null;
 }
@@ -159,7 +170,9 @@ export function collectStatus(): Status {
     );
   }
   if (!installedModel) {
-    warnings.push(`The Vietnamese model is not downloaded in ${modelsDir}.`);
+    warnings.push(
+      `The vi-en codeswitch model is not found. Copy "${MODEL_ID}" to ${modelsDir} or set PASEO_VOICE_VI_CODESWITCH_DIR.`,
+    );
   }
   if (stt?.provider === "external" && command && workerPath && command !== workerPath) {
     warnings.push(`Dictation points at ${command} instead of ${workerPath}.`);

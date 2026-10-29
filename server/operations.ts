@@ -2,7 +2,10 @@ import { fork } from "node:child_process";
 import { copyFileSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { logger } from "./logger.ts";
-import { ensureVietnameseDictationModel } from "./sherpa/vietnamese-model.ts";
+import {
+  codeswitchModelDownloadHint,
+  ensureCodeswitchModel,
+} from "./sherpa/codeswitch-model.ts";
 import {
   readDaemonConfig,
   resolveConfigPath,
@@ -29,9 +32,15 @@ export async function downloadModelOperation(update: (message: string) => void):
   const home = resolvePaseoHome();
   const { config } = readDaemonConfig(resolveConfigPath(home));
   const modelsDir = resolveModelsDir(home, config);
-  update(`Downloading Vietnamese model into ${modelsDir}…`);
-  const modelDir = await ensureVietnameseDictationModel({ modelsDir, logger });
-  return `Model ready at ${modelDir}`;
+  update(`Resolving vi-en codeswitch model…`);
+  try {
+    const modelDir = await ensureCodeswitchModel({ modelsDir, logger });
+    return `Model ready at ${modelDir}`;
+  } catch (error) {
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)} ${codeswitchModelDownloadHint(modelsDir)}`,
+    );
+  }
 }
 
 export async function selfTestOperation(update: (message: string) => void): Promise<string> {

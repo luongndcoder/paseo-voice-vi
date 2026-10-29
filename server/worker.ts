@@ -3,22 +3,23 @@
  * over Node IPC. The daemon (>= this fork) forks this module when dictation STT is configured
  * as `provider: "external"` with `stt.external.command` pointing at it. Voice-mode STT, TTS
  * and turn detection stay with the daemon's built-in worker; this process only handles
- * `dictationStt` sessions with the Nemotron streaming model.
+ * `dictationStt` sessions with the vi-en codeswitch Zipformer streaming model.
  *
- * The model downloads on first use into the daemon's models dir (`config.modelsDir`), the
- * same layout the built-in worker uses, so both workers share one on-disk model.
+ * The custom model has no download URL: it must already exist on disk (resolved from
+ * well-known locations or PASEO_VOICE_VI_CODESWITCH_DIR). See server/sherpa/codeswitch-model.ts.
  */
 import type { StreamingTranscriptionSession } from "./speech-provider.ts";
 import { logger } from "./logger.ts";
 import {
-  SherpaOnlineNemotronEngine,
-  SherpaOnlineNemotronSTT,
-} from "./sherpa/sherpa-online-nemotron-stt.ts";
+  SherpaOnlineZipformerEngine,
+  SherpaOnlineZipformerSTT,
+} from "./sherpa/sherpa-online-zipformer-stt.ts";
 import {
-  ensureVietnameseDictationModel,
-  getVietnameseDictationModelDirectory,
-  resolveInstalledNemotronModelSync,
-} from "./sherpa/vietnamese-model.ts";
+  CODESWITCH_MODEL_ID,
+  ensureCodeswitchModel,
+  getCodeswitchModelDirectory,
+  resolveInstalledCodeswitchModelSync,
+} from "./sherpa/codeswitch-model.ts";
 import { workerBytesToBuffer } from "./worker-bytes.ts";
 
 process.title = "Paseo Voice VI";
@@ -45,8 +46,8 @@ export type VoiceViWorkerToParentMessage =
   | { type: "session.committed"; sessionId: string; payload: unknown }
   | { type: "session.error"; sessionId: string; error: string };
 
-const sttEngines = new Map<string, SherpaOnlineNemotronEngine>();
-const sttProviders = new Map<string, SherpaOnlineNemotronSTT>();
+const sttEngines = new Map<string, SherpaOnlineZipformerEngine>();
+const sttProviders = new Map<string, SherpaOnlineZipformerSTT>();
 const sessions = new Map<string, StreamingTranscriptionSession>();
 let ipcClosing = false;
 
@@ -66,26 +67,26 @@ function sendToParent(message: VoiceViWorkerToParentMessage): void {
 }
 
 function sttEngineKey(config: VoiceViWorkerConfig): string {
-  return `${config.modelsDir}:nemotron-3.5-560ms-int8`;
+  return `${config.modelsDir}:${CODESWITCH_MODEL_ID}`;
 }
 
-async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnlineNemotronSTT> {
+async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnlineZipformerSTT> {
   const key = sttEngineKey(config);
   const existing = sttProviders.get(key);
   if (existing) {
     return existing;
   }
-  let resolved = resolveInstalledNemotronModelSync(config.modelsDir);
+  let resolved = resolveInstalledCodeswitchModelSync(config.modelsDir);
   if (!resolved) {
-    logger.info({ modelsDir: config.modelsDir }, "Vietnamese model missing; downloading");
-    await ensureVietnameseDictationModel({ modelsDir: config.modelsDir, logger });
-    resolved = resolveInstalledNemotronModelSync(config.modelsDir);
+    logger.info({ modelsDir: config.modelsDir }, "Codeswitch model missing; resolving");
+    await ensureCodeswitchModel({ modelsDir: config.modelsDir, logger });
+    resolved = resolveInstalledCodeswitchModelSync(config.modelsDir);
   }
-  const modelDir = resolved?.modelDir ?? getVietnameseDictationModelDirectory(config.modelsDir);
+  const modelDir = resolved?.modelDir ?? getCodeswitchModelDirectory(config.modelsDir);
   const engineKey = sttEngineKey(config);
   let engine = sttEngines.get(engineKey);
   if (!engine) {
-    engine = new SherpaOnlineNemotronEngine(
+    engine = new SherpaOnlineZipformerEngine(
       {
         modelDir,
         encoderPath: resolved?.encoderPath,
@@ -98,7 +99,7 @@ async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnline
     );
     sttEngines.set(engineKey, engine);
   }
-  const created = new SherpaOnlineNemotronSTT(
+  const created = new SherpaOnlineZipformerSTT(
     { engine, defaultLanguage: config.dictationLanguage || "vi" },
     logger as never,
   );

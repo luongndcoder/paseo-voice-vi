@@ -114,7 +114,8 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
       <View style={styles.screen}>
         <Text style={styles.title}>Vietnamese voice</Text>
         <Text style={styles.muted}>
-          On-device Vietnamese dictation (sherpa-onnx Nemotron streaming). This screen checks the
+          On-device Vietnamese-English dictation (sherpa-onnx Zipformer codeswitch streaming).
+          This screen checks the
           worker, downloads the model, self-tests the IPC protocol, and writes the daemon dictation
           config.
         </Text>
@@ -191,7 +192,7 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
           style={styles.button}
           disabled={busy !== null}
         >
-          <Text style={styles.buttonText}>Download Vietnamese model (~200 MB)</Text>
+          <Text style={styles.buttonText}>Locate vi-en codeswitch model (~75 MB)</Text>
         </Pressable>
 
         <Pressable
