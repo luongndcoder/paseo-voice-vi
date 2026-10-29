@@ -15,6 +15,7 @@ import type {
   StreamingTranscriptionSession,
   TranscriptionResult,
 } from "../speech-provider.ts";
+import { normalizeCasing } from "./streaming-utils.ts";
 import { loadSherpaOnnxNode } from "./sherpa-onnx-node-loader.ts";
 
 export interface SherpaOnlineNemotronSttConfig {
@@ -352,7 +353,7 @@ export class SherpaOnlineNemotronEngine {
     this.inputFinished(stream);
     this.decodeReady(stream);
 
-    const text = collapseRepeats(this.getResultText(stream));
+    const text = normalizeCasing(collapseRepeats(this.getResultText(stream)));
     return {
       text,
       language: normalizeNemotronLanguage(language ?? this.config.defaultLanguage),
@@ -401,7 +402,7 @@ export class SherpaOnlineNemotronRealtimeSession
     if (activeStreamText.trim().length > 0) {
       parts.push(activeStreamText.trim());
     }
-    return collapseRepeats(parts.join(" "));
+    return normalizeCasing(collapseRepeats(parts.join(" ")));
   }
 
   appendPcm16(pcm16le: Buffer): void {

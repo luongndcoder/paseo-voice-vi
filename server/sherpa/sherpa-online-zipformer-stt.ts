@@ -17,6 +17,7 @@ import type {
 } from "../speech-provider.ts";
 import {
   collapseRepeats,
+  normalizeCasing,
   normalizeChunkGain,
   resampleLinear,
 } from "./streaming-utils.ts";
@@ -161,7 +162,7 @@ export class SherpaOnlineZipformerEngine {
     stream.acceptWaveform({ sampleRate: normalizedRate, samples: gained });
     recognizer.decode(stream as unknown);
     const raw = recognizer.getResult(stream as unknown);
-    const text = collapseRepeats(typeof raw?.text === "string" ? raw.text.trim() : "");
+    const text = normalizeCasing(collapseRepeats(typeof raw?.text === "string" ? raw.text.trim() : ""));
     return {
       text,
       language: normalizeCodeswitchLanguage(language ?? this.config.defaultLanguage),

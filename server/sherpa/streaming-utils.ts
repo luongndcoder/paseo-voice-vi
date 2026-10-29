@@ -4,6 +4,19 @@
  */
 
 /**
+ * The codeswitch/Nemotron BPE vocab is uppercase-only, so raw transcripts
+ * come out SHOUTING. Lowercase everything, then capitalize sentence starts.
+ * Proper nouns and acronyms lose their caps — an acceptable trade for
+ * readable dictation output.
+ */
+export function normalizeCasing(text: string): string {
+  const lowered = text.toLowerCase();
+  return lowered.replace(/(^|[.!?…]\s+)([\p{L}])/gu, (_, prefix: string, letter: string) =>
+    prefix + letter.toUpperCase(),
+  );
+}
+
+/**
  * Collapses immediate word/phrase repetitions caused by streaming chunk boundaries.
  * Ported from Scribble's `src-tauri/src/stt/text.rs`.
  */
