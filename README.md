@@ -14,10 +14,9 @@ Paseo daemon  ──fork IPC (local-speech worker protocol)──▶  paseo-voic
   (provider "external")                                     sherpa-onnx + model vi-en
 ```
 
-Daemon chỉ cần biết **provider `external` + đường dẫn worker**; toàn bộ phần ASR
-nằm trong gói này. Model là bản custom build (không có link tải công khai) nên
-worker resolve từ disk: bản copy trong `meeting-minutes`, thư mục models của
-daemon, hoặc env `PASEO_VOICE_VI_CODESWITCH_DIR`.
+Daemon chỉ cần biết **provider `external` + đường dẫn worker**; model vi-en (~74 MB)
+được bundle sẵn trong repo (`models/`), cài plugin là có luôn. Nếu thiếu, worker
+tự tải từ HuggingFace `NghiMe/NghiASR` ở lần dùng đầu.
 
 ## Yêu cầu
 
@@ -55,7 +54,7 @@ npm install
 
 # 1. Kiểm tra sherpa-onnx + model + engine khởi tạo được:
 node scripts/doctor.mjs
-# (model resolve từ meeting-minutes / models dir / PASEO_VOICE_VI_CODESWITCH_DIR)
+# (model bundle sẵn trong repo; thiếu thì tự tải từ HuggingFace)
 
 # 2. Test worker protocol không cần daemon:
 node scripts/smoke-test.mjs
