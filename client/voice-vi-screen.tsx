@@ -4,7 +4,7 @@ import { useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
 import { copyText, useToast } from "@getpaseo/plugin/client/react-native";
 import {
   applyConfigRpc,
-  downloadModelRpc,
+  selectModelRpc,
   selfTestRpc,
   statusRpc,
   type Status,
@@ -39,12 +39,6 @@ function useStatus() {
   return { status, error, loading, refresh };
 }
 
-function shortName(path: string | null): string {
-  if (!path) return "Not found";
-  const parts = path.split("/").filter(Boolean);
-  return parts[parts.length - 1] ?? path;
-}
-
 function StepDot({ done, theme }: { done: boolean; theme: { colors: { statusSuccess: string; foregroundMuted: string } } }) {
   return (
     <View
@@ -67,7 +61,7 @@ function StepDot({ done, theme }: { done: boolean; theme: { colors: { statusSucc
 export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
   const toast = useToast();
   const { status, error, loading, refresh } = useStatus();
-  const startDownload = useRpc(downloadModelRpc);
+  const selectModel = useRpc(selectModelRpc);
   const startSelfTest = useRpc(selfTestRpc);
   const applyConfig = useRpc(applyConfigRpc);
   const [busy, setBusy] = useState<string | null>(null);
@@ -135,7 +129,6 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
   );
 
   const modelOk = Boolean(status && status.modelInstalled && status.workerExists && status.sherpaInstalled);
-  const activeModel = status?.models.find((m) => m.id === status.activeModelId) ?? null;
   const testOk = status?.job?.kind === "self-test" && status.job.state === "succeeded";
   const configOk = Boolean(
     status?.dictation.enabled &&
@@ -174,35 +167,45 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
               <StepDot done={modelOk} theme={theme} />
               <View style={styles.stepBody}>
                 <Text style={styles.stepTitle}>1. Speech model</Text>
-                <Text style={styles.muted}>
-                  {modelOk && activeModel
-                    ? `${activeModel.label} is ready.`
-                    : "The voice model was not found on this machine."}
-                </Text>
-                <Text style={styles.tiny}>
-                  Switch model: set PASEO_VOICE_VI_MODEL to “codeswitch” or “nemotron” in the
-                  daemon environment, then restart the daemon.
-                </Text>
-                {!modelOk ? (
-                  <View style={{ marginTop: 8 }}>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Find the voice model"
-                      onPress={() =>
-                        void run("model", async () => {
-                          const result = await startDownload({});
-                          if (!result.started) toast.show("A task is already running.");
-                          else if (result.job.state === "failed") throw new Error(result.job.message);
-                        })
-                      }
-                      style={styles.button}
-                      disabled={busy !== null || jobRunning}
-                    >
-                      <Text style={styles.buttonText}>
-                        {busy === "model" || jobRunning ? "Working…" : "Find the voice model"}
-                      </Text>
-                    </Pressable>
-                  </View>
+                <Text style={styles.muted}>Tap a model to use it. Missing files download automatically.</Text>
+                <View style={{ gap: 8, marginTop: 8 }}>
+                  {status.models.map((model) => {
+                    const selected = model.id === status.activeModelId;
+                    return (
+                      <Pressable
+                        key={model.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Use ${model.label}`}
+                        onPress={() =>
+                          void run(`model-${model.id}`, async () => {
+                            const result = await selectModel({ id: model.id as "codeswitch" | "nemotron" });
+                            if (!result.started) toast.show("A task is already running.");
+                            else if (result.job.state === "failed") throw new Error(result.job.message);
+                          })
+                        }
+                        style={{
+                          padding: 12,
+                          borderRadius: 10,
+                          backgroundColor: selected ? theme.colors.accent : theme.colors.surface2,
+                          opacity: busy !== null || jobRunning ? 0.6 : 1,
+                        }}
+                        disabled={busy !== null || jobRunning || status.selectionSource === "env"}
+                      >
+                        <Text style={selected ? styles.buttonText : styles.secondaryText}>
+                          {selected ? "● " : "○ "}
+                          {model.label}
+                        </Text>
+                        <Text style={selected ? { ...styles.tiny, color: theme.colors.accentForeground } : styles.tiny}>
+                          {model.installed ? "Ready on this machine." : "Not downloaded yet — tap to fetch."}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+                {status.selectionSource === "env" ? (
+                  <Text style={styles.tiny}>
+                    Model is pinned by the PASEO_VOICE_VI_MODEL env on the daemon; unset it to choose here.
+                  </Text>
                 ) : null}
               </View>
             </View>

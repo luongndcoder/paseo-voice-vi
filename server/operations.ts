@@ -8,7 +8,8 @@ import {
   CODESWITCH_MODEL_ID,
 } from "./sherpa/codeswitch-model.ts";
 import { ensureVietnameseDictationModel } from "./sherpa/vietnamese-model.ts";
-import { resolveActiveModelId } from "../shared/contract.ts";
+import { resolveEffectiveModel, writeModelSelection } from "./selection.ts";
+import type { VoiceModelId } from "../shared/contract.ts";
 import {
   readDaemonConfig,
   resolveConfigPath,
@@ -40,9 +41,9 @@ export async function downloadModelOperation(update: (message: string) => void):
   const extraDirs = pluginDirectory
     ? [path.join(pluginDirectory, "models", CODESWITCH_MODEL_ID)]
     : [];
-  update(`Resolving vi-en codeswitch model…`);
+  update(`Resolving voice model…`);
   try {
-    const active = resolveActiveModelId();
+    const active = resolveEffectiveModel(home).id;
     const modelDir =
       active === "nemotron"
         ? await ensureVietnameseDictationModel({ modelsDir, logger })
@@ -55,8 +56,28 @@ export async function downloadModelOperation(update: (message: string) => void):
   }
 }
 
-export async function selfTestOperation(update: (message: string) => void): Promise<string> {
-  const { workerPath } = requirePluginWorker();
+export async function selectModelOperation(
+  id: VoiceModelId,
+  update: (message: string) => void,
+): Promise<string> {
+  const home = resolvePaseoHome();
+  const { config } = readDaemonConfig(resolveConfigPath(home));
+  const modelsDir = resolveModelsDir(home, config);
+  const pluginDirectory = resolvePluginDirectory(home, config);
+  const extraDirs = pluginDirectory
+    ? [path.join(pluginDirectory, "models", CODESWITCH_MODEL_ID)]
+    : [];
+  writeModelSelection(home, id);
+  update(`Selected model saved. Resolving files…`);
+  if (id === "nemotron") {
+    const modelDir = await ensureVietnameseDictationModel({ modelsDir, logger });
+    return `Model ready at ${modelDir}`;
+  }
+  const modelDir = await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
+  return `Model ready at ${modelDir}`;
+}
+
+export async function selfTestOperation(update: (message: string) => void): Promise<string> {  const { workerPath } = requirePluginWorker();
   const home = resolvePaseoHome();
   const { config } = readDaemonConfig(resolveConfigPath(home));
   const modelsDir = resolveModelsDir(home, config);

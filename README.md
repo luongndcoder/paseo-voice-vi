@@ -100,23 +100,16 @@ Xong là bấm mic nói được. Lưu ý hành vi:
 
 ## Chọn model (codeswitch | nemotron)
 
-Worker chọn engine qua env `PASEO_VOICE_VI_MODEL` của daemon (mặc định `codeswitch`):
+Bước 1 màn setup liệt kê cả 2 model — bấm để chọn, thiếu file thì tự tải nền:
 
-| Giá trị | Engine | Ghi chú |
+| Model | Engine | Ghi chú |
 | --- | --- | --- |
-| `codeswitch` | NghiMe vi-en codeswitch Zipformer (~75 MB, bundle sẵn) | Streaming offline, nhẹ, đúng code-switch Việt-Anh |
-| `nemotron` | NVIDIA Nemotron 3.5 streaming (~650 MB, tự tải) | Streaming realtime, đa ngữ; ONNX không chạy trên một số máy Mac (dùng bản MLX của voicescribe thay thế) |
+| NghiMe vi-en codeswitch Zipformer (~75 MB, bundle sẵn) | Streaming offline, nhẹ | Đúng code-switch Việt-Anh |
+| NVIDIA Nemotron 3.5 streaming (~650 MB, tự tải) | Streaming realtime | Đa ngữ; ONNX không chạy trên một số máy Mac |
 
-Đổi trên từng máy (ví dụ máy mạnh dùng nemotron, Mac yếu dùng codeswitch):
-
-```bash
-# macOS (LaunchAgent plist của daemon): thêm vào EnvironmentVariables
-#   <key>PASEO_VOICE_VI_MODEL</key><string>nemotron</string>
-# Linux systemd: thêm vào EnvironmentFile / service env
-PASEO_VOICE_VI_MODEL=nemotron
-# rồi restart daemon. Màn Vietnamese voice hiện model đang active ở bước 1,
-# nút test/tải luôn chạy đúng model đó.
-```
+Lựa chọn lưu vào file `paseo-voice-vi.json` trong PASEO_HOME, worker đọc ở mỗi
+session mới nên **không cần restart daemon**. Env `PASEO_VOICE_VI_MODEL` (set ở
+daemon) luôn thắng file — dùng khi muốn pin cứng 1 model, unset để chọn trên màn hình.
 
 ## Cài tay (không qua plugin)
 

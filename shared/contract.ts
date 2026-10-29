@@ -36,6 +36,13 @@ export function voiceModelLabel(id: string): string {
   return VOICE_MODELS.find((m) => m.id === id)?.label ?? id;
 }
 
+export const SELECTION_FILE_NAME = "paseo-voice-vi.json";
+
+export const ModelSelectionSchema = z.object({
+  model: z.enum(["codeswitch", "nemotron"]),
+});
+export type ModelSelection = z.infer<typeof ModelSelectionSchema>;
+
 export const JobSchema = z.object({
   id: z.string(),
   kind: z.enum(["download-model", "self-test"]),
@@ -45,6 +52,16 @@ export const JobSchema = z.object({
   finishedAt: z.number().optional(),
 });
 export type Job = z.infer<typeof JobSchema>;
+
+export const SelectModelInputSchema = z.object({
+  id: z.enum(["codeswitch", "nemotron"]),
+});
+
+export const selectModelRpc = defineRpc({
+  name: "voicevi.model.select",
+  input: SelectModelInputSchema,
+  output: z.object({ started: z.boolean(), job: JobSchema }),
+});
 
 export const ModelStatusSchema = z.object({
   id: z.string(),
@@ -57,6 +74,7 @@ export type ModelStatus = z.infer<typeof ModelStatusSchema>;
 export const StatusSchema = z.object({
   paseoHome: z.string(),
   activeModelId: z.string(),
+  selectionSource: z.enum(["env", "file", "default"]),
   models: z.array(ModelStatusSchema),
   configPath: z.string(),
   configReadable: z.boolean(),

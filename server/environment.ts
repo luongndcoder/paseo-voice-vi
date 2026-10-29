@@ -6,10 +6,10 @@ import {
   PLUGIN_ID,
   VOICE_MODEL_ENV,
   WORKER_FILE_NAME,
-  resolveActiveModelId,
   voiceModelLabel,
   type Status,
 } from "../shared/contract";
+import { resolveEffectiveModel } from "./selection";
 import { jobSnapshot } from "./jobs";
 import {
   getVietnameseDictationModelDirectory,
@@ -169,8 +169,11 @@ export function collectStatus(): Status {
   const command = stt?.external?.command?.trim() ?? null;
   const language = stt?.language?.trim() ?? null;
   let activeModelId: "codeswitch" | "nemotron" = "codeswitch";
+  let selectionSource: "env" | "file" | "default" = "default";
   try {
-    activeModelId = resolveActiveModelId();
+    const effective = resolveEffectiveModel(home);
+    activeModelId = effective.id;
+    selectionSource = effective.source;
   } catch (cause) {
     warnings.push(cause instanceof Error ? cause.message : String(cause));
   }
@@ -210,6 +213,7 @@ export function collectStatus(): Status {
   return {
     paseoHome: home,
     activeModelId,
+    selectionSource,
     models: [
       {
         id: "codeswitch",

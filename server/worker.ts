@@ -31,7 +31,8 @@ import {
   getVietnameseDictationModelDirectory,
   resolveInstalledNemotronModelSync,
 } from "./sherpa/vietnamese-model.ts";
-import { resolveActiveModelId, type VoiceModelId } from "../shared/contract.ts";
+import type { VoiceModelId } from "../shared/contract.ts";
+import { resolveEffectiveModel, resolvePaseoHomeDir } from "./selection.ts";
 import { workerBytesToBuffer } from "./worker-bytes.ts";
 
 process.title = "Paseo Voice VI";
@@ -87,11 +88,11 @@ function sendToParent(message: VoiceViWorkerToParentMessage): void {
 }
 
 function sttEngineKey(config: VoiceViWorkerConfig): string {
-  return `${config.modelsDir}:${resolveActiveModelId()}`;
+  return `${config.modelsDir}:${effectiveModelId()}`;
 }
 
-function activeModelId(): VoiceModelId {
-  return resolveActiveModelId();
+function effectiveModelId(): VoiceModelId {
+  return resolveEffectiveModel(resolvePaseoHomeDir()).id;
 }
 
 async function getSttProvider(
@@ -102,7 +103,7 @@ async function getSttProvider(
   if (existing) {
     return existing;
   }
-  if (activeModelId() === "nemotron") {
+  if (effectiveModelId() === "nemotron") {
     return getNemotronProvider(config);
   }
   return getCodeswitchProvider(config);
