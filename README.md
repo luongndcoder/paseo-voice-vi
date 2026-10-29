@@ -24,7 +24,23 @@ với daemon nên model tải về dùng chung.
 - Node.js ≥ 23.6 (chạy TypeScript trực tiếp bằng type stripping; khuyến nghị Node 24+).
 - Paseo daemon bản fork mới (có hỗ trợ `stt.provider: "external"`).
 
-## Cài trên máy laptop khác
+## Cài dưới dạng Paseo plugin (khuyên dùng)
+
+Repo này là một Paseo plugin (`paseo-plugin.json`, id `paseo-voice-vi`).
+Cài nhanh nhất qua nút **Install plugin** trong Paseo trỏ tới
+`https://github.com/luongndcoder/paseo-voice-vi`, hoặc bằng CLI:
+
+```bash
+paseo plugin install /path/to/paseo-voice-vi
+paseo plugin ls   # chờ paseo-voice-vi => running
+```
+
+Sau đó mở màn **Vietnamese voice** trong Paseo (sidebar, hoặc ⌘K
+“Open Vietnamese voice setup”): kiểm tra worker, tải model tiếng Việt
+(~200 MB, một lần duy nhất), chạy self-test vòng protocol, rồi bấm
+**Apply dictation config** và restart daemon.
+
+## Cài tay (không qua plugin)
 
 ```bash
 # 1. Copy/cài gói (git clone hoặc npm pack từ máy chính)

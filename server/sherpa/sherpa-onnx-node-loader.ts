@@ -41,7 +41,7 @@ function maybePatchLinuxAddonRunpath(addonPath: string): void {
   if (process.platform !== "linux") {
     return;
   }
-  const patchelfEnv = createExternalCommandProcessEnv("patchelf", process.env);
+  const patchelfEnv = { ...process.env };
   const patchelfCheck = spawnSync("patchelf", ["--version"], {
     env: patchelfEnv,
     stdio: "ignore",

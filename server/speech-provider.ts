@@ -1,5 +1,5 @@
-import type pino from "pino";
 import type { Readable } from "node:stream";
+import type { VoiceViLogger } from "./logger.ts";
 
 export interface LogprobToken {
   token: string;
@@ -52,7 +52,7 @@ export interface StreamingTranscriptionSession {
 export interface SpeechToTextProvider {
   id: "openai" | "local" | (string & {});
   createSession(params: {
-    logger: pino.Logger;
+    logger: VoiceViLogger;
     language?: string;
     prompt?: string;
   }): StreamingTranscriptionSession;

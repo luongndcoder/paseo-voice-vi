@@ -194,14 +194,10 @@ function handleSessionRequest(message: VoiceViSessionRequest): void {
       }
       break;
     case "session.flush":
-      if (session && "flush" in session) {
-        session.flush();
-      }
+      (session as unknown as { flush?: () => void }).flush?.();
       break;
     case "session.reset":
-      if (session && "reset" in session) {
-        session.reset();
-      }
+      (session as unknown as { reset?: () => void }).reset?.();
       break;
   }
   sendOk(message.requestId);

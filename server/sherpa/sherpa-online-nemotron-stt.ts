@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { randomUUID as uuidv4 } from "node:crypto";
-import type pino from "pino";
+import type { VoiceViLogger } from "../logger.ts";
 
 import {
   parsePcm16MonoWav,
@@ -178,13 +178,13 @@ function resampleLinear(
 }
 
 export class SherpaOnlineNemotronEngine {
-  private readonly logger: pino.Logger;
+  private readonly logger: VoiceViLogger;
   private readonly config: Required<Omit<SherpaOnlineNemotronSttConfig, "modelDir">> & {
     modelDir?: string;
   };
   private recognizer: SherpaOnlineRecognizerInstance | null = null;
 
-  constructor(config: SherpaOnlineNemotronSttConfig, logger: pino.Logger) {
+  constructor(config: SherpaOnlineNemotronSttConfig, logger: VoiceViLogger) {
     this.logger = logger.child({ component: "sherpa-online-nemotron-engine" });
     const baseDir = config.modelDir ?? "";
     this.config = {
@@ -521,7 +521,7 @@ export class SherpaOnlineNemotronRealtimeSession
 
 export class SherpaOnlineNemotronSTT implements SpeechToTextProvider {
   public readonly id = "local" as const;
-  private readonly logger: pino.Logger;
+  private readonly logger: VoiceViLogger;
   private readonly engine: SherpaOnlineNemotronEngine;
   private readonly defaultLanguage: string;
   private readonly silencePeakThreshold: number;
@@ -531,7 +531,7 @@ export class SherpaOnlineNemotronSTT implements SpeechToTextProvider {
       | SherpaOnlineNemotronSttConfig
       | SherpaOnlineNemotronEngine
       | { engine: SherpaOnlineNemotronEngine; defaultLanguage?: string },
-    logger: pino.Logger,
+    logger: VoiceViLogger,
     defaultLanguage?: string,
     silencePeakThreshold: number = 200,
   ) {
@@ -562,7 +562,7 @@ export class SherpaOnlineNemotronSTT implements SpeechToTextProvider {
   }
 
   public createSession(params: {
-    logger: pino.Logger;
+    logger: VoiceViLogger;
     language?: string;
     prompt?: string;
   }): StreamingTranscriptionSession {

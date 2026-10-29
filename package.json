@@ -1,7 +1,7 @@
 {
   "name": "paseo-voice-vi",
   "version": "0.1.0",
-  "description": "Standalone Vietnamese dictation STT worker for Paseo (sherpa-onnx Nemotron streaming, speaks the Paseo local-speech worker protocol over IPC).",
+  "description": "On-device Vietnamese dictation STT worker for Paseo (sherpa-onnx Nemotron streaming, speaks the Paseo local-speech worker protocol over IPC).",
   "type": "module",
   "private": true,
   "engines": {
@@ -13,7 +13,32 @@
     "paseo-voice-vi-doctor": "scripts/doctor.mjs",
     "paseo-voice-vi-smoke-test": "scripts/smoke-test.mjs"
   },
+  "files": [
+    "paseo-plugin.json",
+    "OVERVIEW.md",
+    "OVERVIEW.*.md",
+    "index.client.ts",
+    "index.client.tsx",
+    "index.server.ts",
+    "index.server.tsx",
+    "bin/",
+    "client/",
+    "server/",
+    "shared/"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
   "dependencies": {
     "sherpa-onnx-node": "^1.13.8"
+  },
+  "devDependencies": {
+    "@getpaseo/plugin": "0.13.0-beta.2",
+    "@types/node": "^26.6.5",
+    "@types/react": "~19.2.0",
+    "react": "19.1.0",
+    "react-native": "0.81.5",
+    "typescript": "^5.9.3",
+    "zod": "^4.4.3"
   }
 }

@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
-import type pino from "pino";
+import type { VoiceViLogger } from "../logger.ts";
 
 export const NEMOTRON_MODEL_ID = "nemotron-3.5-560ms-int8";
 export const VIETNAMESE_SHERPA_MODEL_DIR_NAME = NEMOTRON_MODEL_ID;
@@ -118,7 +118,7 @@ async function downloadFileToPath(
 
 export async function ensureVietnameseSherpaModel(
   modelsDir: string,
-  logger: pino.Logger,
+  logger: VoiceViLogger,
   signal?: AbortSignal,
 ): Promise<VietnameseSherpaModelFiles> {
   const log = logger.child({
@@ -173,7 +173,7 @@ export async function ensureVietnameseSherpaModel(
 
 export async function ensureVietnameseDictationModel(options: {
   modelsDir: string;
-  logger: pino.Logger;
+  logger: VoiceViLogger;
   signal?: AbortSignal;
 }): Promise<string> {
   const resolved = await ensureVietnameseSherpaModel(

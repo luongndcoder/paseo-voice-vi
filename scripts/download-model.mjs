@@ -4,8 +4,8 @@
 import os from "node:os";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { logger } from "../src/logger.ts";
-import { ensureVietnameseDictationModel, isVietnameseDictationModelInstalled } from "../src/sherpa/vietnamese-model.ts";
+import { logger } from "../server/logger.ts";
+import { ensureVietnameseDictationModel, isVietnameseDictationModelInstalled } from "../server/sherpa/vietnamese-model.ts";
 
 const modelsDir =
   process.argv[2] ?? path.join(os.homedir(), ".paseo", "models", "local-speech");

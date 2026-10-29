@@ -2,12 +2,12 @@
 // can be created. Exit code 0 = ready. Usage: node scripts/doctor.mjs [modelsDir]
 import os from "node:os";
 import path from "node:path";
-import { logger } from "../src/logger.ts";
+import { logger } from "../server/logger.ts";
 import {
   ensureVietnameseDictationModel,
   isVietnameseDictationModelInstalled,
-} from "../src/sherpa/vietnamese-model.ts";
-import { SherpaOnlineNemotronEngine } from "../src/sherpa/sherpa-online-nemotron-stt.ts";
+} from "../server/sherpa/vietnamese-model.ts";
+import { SherpaOnlineNemotronEngine } from "../server/sherpa/sherpa-online-nemotron-stt.ts";
 
 const modelsDir =
   process.argv[2] ?? path.join(os.homedir(), ".paseo", "models", "local-speech");

@@ -1,0 +1,8 @@
+{
+  "id": "paseo-voice-vi",
+  "description": "On-device Vietnamese dictation for Paseo (sherpa-onnx Nemotron streaming) with setup checks and one-click daemon config.",
+  "requirements": {
+    "paseo": ">=0.13.0-beta.2"
+  },
+  "build": [["npm", "ci", "--omit=dev", "--ignore-scripts"]]
+}
