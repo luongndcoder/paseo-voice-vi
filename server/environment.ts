@@ -104,20 +104,19 @@ function isNonEmptyFile(directory: string, name: string): boolean {
   }
 }
 
-export function findInstalledModelDirectory(modelsDir: string): string | null {
+export function findInstalledModelDirectory(
+  modelsDir: string,
+  pluginDirectory: string | null,
+): string | null {
   const candidates = [
-    // meeting-minutes project copies (dev + bundled sidecar resources).
-    "/Users/luongcoder/Documents/AI/meeting-minutes/src-python/models/local",
-    "/Users/luongcoder/Documents/AI/meeting-minutes/src-tauri/resources/models/local",
-    path.join(os.homedir(), "Documents/AI/meeting-minutes/src-python/models/local"),
+    // Model bundled with this plugin.
+    pluginDirectory ? path.join(pluginDirectory, "models", MODEL_ID) : undefined,
     path.join(modelsDir, MODEL_ID),
     path.join(os.homedir(), ".paseo", "models", "local-speech", MODEL_ID),
     path.join(os.homedir(), ".voicescribe", "models", MODEL_ID),
   ];
   for (const candidate of candidates) {
-    const dir =
-      path.basename(candidate) === MODEL_ID ? candidate : path.join(candidate, MODEL_ID);
-    if (hasModelFiles(dir)) return dir;
+    if (candidate && hasModelFiles(candidate)) return candidate;
   }
   return null;
 }
@@ -148,7 +147,7 @@ export function collectStatus(): Status {
   const pluginDirectory = resolvePluginDirectory(home, config);
   const workerPath = pluginDirectory ? path.join(pluginDirectory, "bin", WORKER_FILE_NAME) : null;
   const modelsDir = resolveModelsDir(home, config);
-  const installedModel = findInstalledModelDirectory(modelsDir);
+  const installedModel = findInstalledModelDirectory(modelsDir, pluginDirectory);
 
   const dictation = config?.features?.dictation;
   const stt = dictation?.stt;

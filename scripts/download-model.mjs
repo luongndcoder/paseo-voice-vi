@@ -12,11 +12,15 @@ import {
 const modelsDir =
   process.argv[2] ?? path.join(os.homedir(), ".paseo", "models", "local-speech");
 
-if (await isCodeswitchModelInstalled(modelsDir)) {
+// Model bundled with this repo: <repoRoot>/models/<id>.
+const repoRoot = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+const extraDirs = [path.join(repoRoot, "models", CODESWITCH_MODEL_ID)];
+
+if (await isCodeswitchModelInstalled(modelsDir, extraDirs)) {
   console.log(`[paseo-voice-vi] Codeswitch model already installed for ${modelsDir}`);
 } else {
   console.log(`[paseo-voice-vi] Resolving codeswitch model ...`);
-  const modelDir = await ensureCodeswitchModel({ modelsDir, logger });
+  const modelDir = await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
   console.log(`[paseo-voice-vi] Model ready at ${modelDir}`);
 }
 process.exit(0);

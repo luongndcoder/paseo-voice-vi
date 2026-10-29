@@ -9,6 +9,8 @@
  * well-known locations or PASEO_VOICE_VI_CODESWITCH_DIR). See server/sherpa/codeswitch-model.ts.
  */
 import type { StreamingTranscriptionSession } from "./speech-provider.ts";
+import { fileURLToPath } from "node:url";
+import path from "node:path";
 import { logger } from "./logger.ts";
 import {
   SherpaOnlineZipformerEngine,
@@ -51,6 +53,14 @@ const sttProviders = new Map<string, SherpaOnlineZipformerSTT>();
 const sessions = new Map<string, StreamingTranscriptionSession>();
 let ipcClosing = false;
 
+/** Model dir bundled with this plugin: <pluginRoot>/models/<id>. */
+function bundledModelDir(): string {
+  const pluginRoot = path.dirname(
+    path.dirname(fileURLToPath(import.meta.url)),
+  );
+  return path.join(pluginRoot, "models", CODESWITCH_MODEL_ID);
+}
+
 function sendToParent(message: VoiceViWorkerToParentMessage): void {
   if (ipcClosing || !process.connected || !process.send) {
     return;
@@ -76,13 +86,14 @@ async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnline
   if (existing) {
     return existing;
   }
-  let resolved = resolveInstalledCodeswitchModelSync(config.modelsDir);
+  const extraDirs = [bundledModelDir()];
+  let resolved = resolveInstalledCodeswitchModelSync(config.modelsDir, extraDirs);
   if (!resolved) {
-    logger.info({ modelsDir: config.modelsDir }, "Codeswitch model missing; resolving");
-    await ensureCodeswitchModel({ modelsDir: config.modelsDir, logger });
-    resolved = resolveInstalledCodeswitchModelSync(config.modelsDir);
+    logger.info({ modelsDir: config.modelsDir }, "Codeswitch model missing; downloading");
+    await ensureCodeswitchModel({ modelsDir: config.modelsDir, extraDirs, logger });
+    resolved = resolveInstalledCodeswitchModelSync(config.modelsDir, extraDirs);
   }
-  const modelDir = resolved?.modelDir ?? getCodeswitchModelDirectory(config.modelsDir);
+  const modelDir = resolved?.modelDir ?? getCodeswitchModelDirectory(config.modelsDir, extraDirs);
   const engineKey = sttEngineKey(config);
   let engine = sttEngines.get(engineKey);
   if (!engine) {

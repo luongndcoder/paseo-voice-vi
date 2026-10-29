@@ -5,6 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { logger } from "../server/logger.ts";
 import {
+  CODESWITCH_MODEL_ID,
   ensureCodeswitchModel,
   isCodeswitchModelInstalled,
   resolveInstalledCodeswitchModelSync,
@@ -14,14 +15,18 @@ import { SherpaOnlineZipformerEngine } from "../server/sherpa/sherpa-online-zipf
 const modelsDir =
   process.argv[2] ?? path.join(os.homedir(), ".paseo", "models", "local-speech");
 
+// Model bundled with this repo: <repoRoot>/models/<id>.
+const repoRoot = path.dirname(path.dirname(new URL(import.meta.url).pathname));
+const extraDirs = [path.join(repoRoot, "models", CODESWITCH_MODEL_ID)];
+
 console.log(`[doctor] modelsDir: ${modelsDir}`);
-if (!(await isCodeswitchModelInstalled(modelsDir))) {
+if (!(await isCodeswitchModelInstalled(modelsDir, extraDirs))) {
   console.log("[doctor] model missing; resolving ...");
 }
-const resolved = await ensureCodeswitchModel({ modelsDir, logger });
+const resolved = await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
 console.log(`[doctor] model dir: ${resolved}`);
 
-const files = resolveInstalledCodeswitchModelSync(modelsDir);
+const files = resolveInstalledCodeswitchModelSync(modelsDir, extraDirs);
 if (!files) throw new Error("Model resolved but files not found");
 const engine = new SherpaOnlineZipformerEngine(
   {

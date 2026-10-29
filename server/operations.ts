@@ -5,6 +5,7 @@ import { logger } from "./logger.ts";
 import {
   codeswitchModelDownloadHint,
   ensureCodeswitchModel,
+  CODESWITCH_MODEL_ID,
 } from "./sherpa/codeswitch-model.ts";
 import {
   readDaemonConfig,
@@ -30,11 +31,16 @@ function requirePluginWorker(): { pluginDirectory: string; workerPath: string } 
 
 export async function downloadModelOperation(update: (message: string) => void): Promise<string> {
   const home = resolvePaseoHome();
-  const { config } = readDaemonConfig(resolveConfigPath(home));
+  const configPath = resolveConfigPath(home);
+  const { config } = readDaemonConfig(configPath);
   const modelsDir = resolveModelsDir(home, config);
+  const pluginDirectory = resolvePluginDirectory(home, config);
+  const extraDirs = pluginDirectory
+    ? [path.join(pluginDirectory, "models", CODESWITCH_MODEL_ID)]
+    : [];
   update(`Resolving vi-en codeswitch model…`);
   try {
-    const modelDir = await ensureCodeswitchModel({ modelsDir, logger });
+    const modelDir = await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
     return `Model ready at ${modelDir}`;
   } catch (error) {
     throw new Error(

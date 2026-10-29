@@ -9,21 +9,29 @@ import type { VoiceViLogger } from "../logger.ts";
 export const CODESWITCH_MODEL_ID = "nghiasr-vi-en-codeswitch-streaming";
 
 /**
- * Optional download source for the custom model. Empty by default: set
- * PASEO_VOICE_VI_MODEL_URL to a base URL holding the files below
- * (e.g. a HuggingFace resolve URL), and the plugin downloads it on demand.
+ * Default download source for the custom model (public HuggingFace repo).
+ * PASEO_VOICE_VI_MODEL_URL overrides it with another base URL holding the
+ * same remote file names (e.g. a mirror or a pinned revision URL).
  */
+const DEFAULT_CODESWITCH_MODEL_URL = "https://huggingface.co/NghiMe/NghiASR/resolve/main";
+
 function codeswitchModelBaseUrl(): string | null {
   const fromEnv = process.env.PASEO_VOICE_VI_MODEL_URL?.trim();
-  return fromEnv && fromEnv.length > 0 ? fromEnv.replace(/\/+$/, "") : null;
+  if (fromEnv && fromEnv.length > 0) return fromEnv.replace(/\/+$/, "");
+  return DEFAULT_CODESWITCH_MODEL_URL;
 }
 
-const CODESWITCH_MODEL_FILES = [
-  "encoder.int8.onnx",
-  "decoder.onnx",
-  "joiner.int8.onnx",
-  "tokens.txt",
-] as const;
+interface CodeswitchDownloadFile {
+  remote: string;
+  local: string;
+}
+
+const CODESWITCH_MODEL_FILES: CodeswitchDownloadFile[] = [
+  { remote: "encoder-epoch-4-avg-4.int8.onnx", local: "encoder.int8.onnx" },
+  { remote: "decoder-epoch-4-avg-4.onnx", local: "decoder.onnx" },
+  { remote: "joiner-epoch-4-avg-4.int8.onnx", local: "joiner.int8.onnx" },
+  { remote: "tokens.txt", local: "tokens.txt" },
+];
 
 export interface CodeswitchModelFiles {
   modelDir: string;
@@ -36,13 +44,11 @@ export interface CodeswitchModelFiles {
 const HOME = os.homedir();
 
 /** Known on-disk locations of the custom vi-en codeswitch Zipformer model. */
-function candidateCodeswitchDirs(modelsDir?: string | null): string[] {
+function candidateCodeswitchDirs(modelsDir?: string | null, extraDirs?: string[]): string[] {
   const candidates = [
     process.env.PASEO_VOICE_VI_CODESWITCH_DIR?.trim(),
-    // meeting-minutes project checkout (dev + bundled sidecar resources).
-    path.join(HOME, "Documents/AI/meeting-minutes/src-python/models/local"),
-    path.join(HOME, "Documents/AI/meeting-minutes/src-tauri/resources/local"),
-    path.join(HOME, "workspace/personal/meeting-minutes/src-python/models/local"),
+    // Model bundled with this plugin (models/<id> next to paseo-plugin.json).
+    ...(extraDirs ?? []),
     modelsDir ? path.join(modelsDir, CODESWITCH_MODEL_ID) : undefined,
     path.join(HOME, ".paseo", "models", "local-speech", CODESWITCH_MODEL_ID),
     path.join(HOME, ".voicescribe", "models", CODESWITCH_MODEL_ID),
@@ -95,24 +101,31 @@ function resolveFromDirSync(dir: string): CodeswitchModelFiles | null {
 
 export function resolveInstalledCodeswitchModelSync(
   modelsDir?: string | null,
+  extraDirs?: string[],
 ): CodeswitchModelFiles | null {
-  for (const dir of candidateCodeswitchDirs(modelsDir)) {
+  for (const dir of candidateCodeswitchDirs(modelsDir, extraDirs)) {
     const resolved = resolveFromDirSync(dir);
     if (resolved) return resolved;
   }
   return null;
 }
 
-export function isCodeswitchModelInstalledSync(modelsDir?: string | null): boolean {
-  return resolveInstalledCodeswitchModelSync(modelsDir) !== null;
+export function isCodeswitchModelInstalledSync(
+  modelsDir?: string | null,
+  extraDirs?: string[],
+): boolean {
+  return resolveInstalledCodeswitchModelSync(modelsDir, extraDirs) !== null;
 }
 
-export async function isCodeswitchModelInstalled(modelsDir: string): Promise<boolean> {
-  return isCodeswitchModelInstalledSync(modelsDir);
+export async function isCodeswitchModelInstalled(
+  modelsDir: string,
+  extraDirs?: string[],
+): Promise<boolean> {
+  return isCodeswitchModelInstalledSync(modelsDir, extraDirs);
 }
 
-export function getCodeswitchModelDirectory(modelsDir: string): string {
-  const installed = resolveInstalledCodeswitchModelSync(modelsDir);
+export function getCodeswitchModelDirectory(modelsDir: string, extraDirs?: string[]): string {
+  const installed = resolveInstalledCodeswitchModelSync(modelsDir, extraDirs);
   if (installed) return installed.modelDir;
   return path.join(modelsDir, CODESWITCH_MODEL_ID);
 }
@@ -147,9 +160,10 @@ async function downloadFileToPath(
 export async function ensureCodeswitchModel(options: {
   modelsDir: string;
   logger: VoiceViLogger;
+  extraDirs?: string[];
   signal?: AbortSignal;
 }): Promise<string> {
-  const resolved = resolveInstalledCodeswitchModelSync(options.modelsDir);
+  const resolved = resolveInstalledCodeswitchModelSync(options.modelsDir, options.extraDirs);
   if (resolved) {
     options.logger.info(
       { modelDir: resolved.modelDir },
@@ -161,8 +175,8 @@ export async function ensureCodeswitchModel(options: {
   const destDir = path.join(path.resolve(options.modelsDir), CODESWITCH_MODEL_ID);
   if (baseUrl) {
     await fs.mkdir(destDir, { recursive: true });
-    for (const fileName of CODESWITCH_MODEL_FILES) {
-      const destPath = path.join(destDir, fileName);
+    for (const { remote, local } of CODESWITCH_MODEL_FILES) {
+      const destPath = path.join(destDir, local);
       try {
         const stat = await fs.stat(destPath);
         if (stat.isFile() && stat.size > 0) continue;
@@ -170,10 +184,10 @@ export async function ensureCodeswitchModel(options: {
         // download below
       }
       options.logger.info(
-        { fileName, baseUrl },
+        { remote, baseUrl },
         "Downloading vi-en codeswitch model file",
       );
-      await downloadFileToPath(`${baseUrl}/${fileName}`, destPath, options.signal);
+      await downloadFileToPath(`${baseUrl}/${remote}`, destPath, options.signal);
     }
     const downloaded = resolveFromDirSync(destDir);
     if (!downloaded) {
@@ -187,10 +201,10 @@ export async function ensureCodeswitchModel(options: {
     );
     return downloaded.modelDir;
   }
-  const searched = candidateCodeswitchDirs(options.modelsDir).join(", ");
+  const searched = candidateCodeswitchDirs(options.modelsDir, options.extraDirs).join(", ");
   options.logger.info(
     { searched, destDir },
-    "Vi-en codeswitch model not found on disk and no download URL configured",
+    "Vi-en codeswitch model not found on disk, downloading from HuggingFace",
   );
   throw new Error(
     `Vi-en codeswitch model not found. ` +
@@ -200,13 +214,6 @@ export async function ensureCodeswitchModel(options: {
   );
 }
 
-export function codeswitchModelDownloadHint(modelsDir: string): string {
-  if (codeswitchModelBaseUrl()) {
-    return `The model downloads automatically on first use.`;
-  }
-  return (
-    `The vi-en codeswitch model has no download URL configured. ` +
-    `Copy "${CODESWITCH_MODEL_ID}" to ${path.join(modelsDir, CODESWITCH_MODEL_ID)}, ` +
-    `set PASEO_VOICE_VI_CODESWITCH_DIR, or set PASEO_VOICE_VI_MODEL_URL.`
-  );
+export function codeswitchModelDownloadHint(_modelsDir: string): string {
+  return `The model downloads automatically (~77 MB) from HuggingFace on first use.`;
 }
