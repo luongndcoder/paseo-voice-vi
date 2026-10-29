@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import { useRpc, type PluginScreenProps } from "@getpaseo/plugin/client";
-import { copyText, useToast } from "@getpaseo/plugin/client/ui";
+import { copyText, useToast } from "@getpaseo/plugin/client/react-native";
 import {
   applyConfigRpc,
   downloadModelRpc,
@@ -242,6 +242,10 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
                   {configOk
                     ? "Paseo is connected to the voice engine."
                     : "Point Paseo dictation at the voice engine, then restart the daemon."}
+                </Text>
+                <Text style={styles.tiny}>
+                  Needs a Paseo daemon with external dictation support (fork 0.13+). Stock
+                  Paseo rejects this config.
                 </Text>
                 {!configOk ? (
                   <View style={{ marginTop: 8 }}>
