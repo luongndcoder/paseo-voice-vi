@@ -98,6 +98,26 @@ Xong là bấm mic nói được. Lưu ý hành vi:
 - Chữ chỉ hiện khi **nhả mic** (model chạy offline theo từng đoạn, không có chữ live).
 - Output viết **HOA** (do BPE tokens của model viết hoa: `▁LÀ`, `▁THE`).
 
+## Chọn model (codeswitch | nemotron)
+
+Worker chọn engine qua env `PASEO_VOICE_VI_MODEL` của daemon (mặc định `codeswitch`):
+
+| Giá trị | Engine | Ghi chú |
+| --- | --- | --- |
+| `codeswitch` | NghiMe vi-en codeswitch Zipformer (~75 MB, bundle sẵn) | Streaming offline, nhẹ, đúng code-switch Việt-Anh |
+| `nemotron` | NVIDIA Nemotron 3.5 streaming (~650 MB, tự tải) | Streaming realtime, đa ngữ; ONNX không chạy trên một số máy Mac (dùng bản MLX của voicescribe thay thế) |
+
+Đổi trên từng máy (ví dụ máy mạnh dùng nemotron, Mac yếu dùng codeswitch):
+
+```bash
+# macOS (LaunchAgent plist của daemon): thêm vào EnvironmentVariables
+#   <key>PASEO_VOICE_VI_MODEL</key><string>nemotron</string>
+# Linux systemd: thêm vào EnvironmentFile / service env
+PASEO_VOICE_VI_MODEL=nemotron
+# rồi restart daemon. Màn Vietnamese voice hiện model đang active ở bước 1,
+# nút test/tải luôn chạy đúng model đó.
+```
+
 ## Cài tay (không qua plugin)
 
 ```bash

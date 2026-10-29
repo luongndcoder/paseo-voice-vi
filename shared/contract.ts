@@ -5,6 +5,37 @@ export const PLUGIN_ID = "paseo-voice-vi";
 export const WORKER_FILE_NAME = "worker.mjs";
 export const MODEL_ID = "nghiasr-vi-en-codeswitch-streaming";
 
+export type VoiceModelId = "codeswitch" | "nemotron";
+
+export const VOICE_MODEL_ENV = "PASEO_VOICE_VI_MODEL";
+
+export const VOICE_MODELS: { id: VoiceModelId; label: string; modelDir: string }[] = [
+  {
+    id: "codeswitch",
+    label: "NghiMe vi-en codeswitch Zipformer (~75 MB)",
+    modelDir: "nghiasr-vi-en-codeswitch-streaming",
+  },
+  {
+    id: "nemotron",
+    label: "NVIDIA Nemotron 3.5 streaming (~650 MB)",
+    modelDir: "nemotron-3.5-560ms-int8",
+  },
+];
+
+/** Which engine the worker (and setup screen) uses. Daemon env wins. */
+export function resolveActiveModelId(env?: Record<string, string | undefined>): VoiceModelId {
+  const raw = (env ?? process.env)[VOICE_MODEL_ENV]?.trim().toLowerCase();
+  if (!raw) return "codeswitch";
+  if (raw === "codeswitch" || raw === "nemotron") return raw;
+  throw new Error(
+    `Invalid ${VOICE_MODEL_ENV}=${JSON.stringify(raw)}. Use "codeswitch" or "nemotron".`,
+  );
+}
+
+export function voiceModelLabel(id: string): string {
+  return VOICE_MODELS.find((m) => m.id === id)?.label ?? id;
+}
+
 export const JobSchema = z.object({
   id: z.string(),
   kind: z.enum(["download-model", "self-test"]),
@@ -15,8 +46,18 @@ export const JobSchema = z.object({
 });
 export type Job = z.infer<typeof JobSchema>;
 
+export const ModelStatusSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  installed: z.boolean(),
+  directory: z.string(),
+});
+export type ModelStatus = z.infer<typeof ModelStatusSchema>;
+
 export const StatusSchema = z.object({
   paseoHome: z.string(),
+  activeModelId: z.string(),
+  models: z.array(ModelStatusSchema),
   configPath: z.string(),
   configReadable: z.boolean(),
   configError: z.string().nullable(),

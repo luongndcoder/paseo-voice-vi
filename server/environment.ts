@@ -1,8 +1,20 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { MODEL_ID, PLUGIN_ID, WORKER_FILE_NAME, type Status } from "../shared/contract";
+import {
+  MODEL_ID,
+  PLUGIN_ID,
+  VOICE_MODEL_ENV,
+  WORKER_FILE_NAME,
+  resolveActiveModelId,
+  voiceModelLabel,
+  type Status,
+} from "../shared/contract";
 import { jobSnapshot } from "./jobs";
+import {
+  getVietnameseDictationModelDirectory,
+  resolveInstalledNemotronModelSync,
+} from "./sherpa/vietnamese-model";
 
 interface DaemonConfigShape {
   providers?: { local?: { modelsDir?: string } };
@@ -149,13 +161,20 @@ export function collectStatus(): Status {
   const modelsDir = resolveModelsDir(home, config);
   const installedModel = findInstalledModelDirectory(modelsDir, pluginDirectory);
 
+  const warnings: string[] = [];
+  if (error) warnings.push(`Cannot read ${configPath}: ${error}`);
+
   const dictation = config?.features?.dictation;
   const stt = dictation?.stt;
   const command = stt?.external?.command?.trim() ?? null;
   const language = stt?.language?.trim() ?? null;
+  let activeModelId: "codeswitch" | "nemotron" = "codeswitch";
+  try {
+    activeModelId = resolveActiveModelId();
+  } catch (cause) {
+    warnings.push(cause instanceof Error ? cause.message : String(cause));
+  }
 
-  const warnings: string[] = [];
-  if (error) warnings.push(`Cannot read ${configPath}: ${error}`);
   if (!pluginDirectory) {
     warnings.push(
       `This plugin is not listed in ${configPath} yet. Install it from the Plugins settings so the worker path resolves.`,
@@ -170,15 +189,41 @@ export function collectStatus(): Status {
   }
   if (!installedModel) {
     warnings.push(
-      `The vi-en codeswitch model is not found. Copy "${MODEL_ID}" to ${modelsDir} or set PASEO_VOICE_VI_CODESWITCH_DIR.`,
+      `The vi-en codeswitch model is not found. It downloads automatically on first use; ` +
+        `for an offline copy, place "${MODEL_ID}" in ${modelsDir} or set PASEO_VOICE_VI_CODESWITCH_DIR.`,
     );
   }
   if (stt?.provider === "external" && command && workerPath && command !== workerPath) {
     warnings.push(`Dictation points at ${command} instead of ${workerPath}.`);
   }
 
+  const nemotronInstalled = resolveInstalledNemotronModelSync(modelsDir);
+  const nemotronDir =
+    nemotronInstalled?.modelDir ?? getVietnameseDictationModelDirectory(modelsDir);
+  if (activeModelId === "nemotron" && !nemotronInstalled) {
+    warnings.push(
+      `Nemotron model is selected (${VOICE_MODEL_ENV}=nemotron) but not downloaded yet. ` +
+        `It downloads automatically (~650 MB) on first use.`,
+    );
+  }
+
   return {
     paseoHome: home,
+    activeModelId,
+    models: [
+      {
+        id: "codeswitch",
+        label: voiceModelLabel("codeswitch"),
+        installed: installedModel !== null,
+        directory: installedModel ?? path.join(modelsDir, MODEL_ID),
+      },
+      {
+        id: "nemotron",
+        label: voiceModelLabel("nemotron"),
+        installed: nemotronInstalled !== null,
+        directory: nemotronDir,
+      },
+    ],
     configPath,
     configReadable: error === null,
     configError: error,
@@ -189,8 +234,12 @@ export function collectStatus(): Status {
       pluginDirectory && existsSync(path.join(pluginDirectory, "node_modules", "sherpa-onnx-node")),
     ),
     modelsDir,
-    modelInstalled: installedModel !== null,
-    modelDirectory: installedModel ?? path.join(modelsDir, MODEL_ID),
+    modelInstalled:
+      activeModelId === "nemotron" ? nemotronInstalled !== null : installedModel !== null,
+    modelDirectory:
+      activeModelId === "nemotron"
+        ? nemotronDir
+        : (installedModel ?? path.join(modelsDir, MODEL_ID)),
     dictation: {
       enabled: dictation?.enabled === true,
       provider: stt?.provider?.trim() ?? null,

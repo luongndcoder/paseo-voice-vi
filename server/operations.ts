@@ -7,6 +7,8 @@ import {
   ensureCodeswitchModel,
   CODESWITCH_MODEL_ID,
 } from "./sherpa/codeswitch-model.ts";
+import { ensureVietnameseDictationModel } from "./sherpa/vietnamese-model.ts";
+import { resolveActiveModelId } from "../shared/contract.ts";
 import {
   readDaemonConfig,
   resolveConfigPath,
@@ -40,7 +42,11 @@ export async function downloadModelOperation(update: (message: string) => void):
     : [];
   update(`Resolving vi-en codeswitch model…`);
   try {
-    const modelDir = await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
+    const active = resolveActiveModelId();
+    const modelDir =
+      active === "nemotron"
+        ? await ensureVietnameseDictationModel({ modelsDir, logger })
+        : await ensureCodeswitchModel({ modelsDir, extraDirs, logger });
     return `Model ready at ${modelDir}`;
   } catch (error) {
     throw new Error(

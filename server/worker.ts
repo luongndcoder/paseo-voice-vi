@@ -17,11 +17,21 @@ import {
   SherpaOnlineZipformerSTT,
 } from "./sherpa/sherpa-online-zipformer-stt.ts";
 import {
+  SherpaOnlineNemotronEngine,
+  SherpaOnlineNemotronSTT,
+} from "./sherpa/sherpa-online-nemotron-stt.ts";
+import {
   CODESWITCH_MODEL_ID,
   ensureCodeswitchModel,
   getCodeswitchModelDirectory,
   resolveInstalledCodeswitchModelSync,
 } from "./sherpa/codeswitch-model.ts";
+import {
+  ensureVietnameseDictationModel,
+  getVietnameseDictationModelDirectory,
+  resolveInstalledNemotronModelSync,
+} from "./sherpa/vietnamese-model.ts";
+import { resolveActiveModelId, type VoiceModelId } from "../shared/contract.ts";
 import { workerBytesToBuffer } from "./worker-bytes.ts";
 
 process.title = "Paseo Voice VI";
@@ -48,8 +58,8 @@ export type VoiceViWorkerToParentMessage =
   | { type: "session.committed"; sessionId: string; payload: unknown }
   | { type: "session.error"; sessionId: string; error: string };
 
-const sttEngines = new Map<string, SherpaOnlineZipformerEngine>();
-const sttProviders = new Map<string, SherpaOnlineZipformerSTT>();
+const sttEngines = new Map<string, SherpaOnlineZipformerEngine | SherpaOnlineNemotronEngine>();
+const sttProviders = new Map<string, SherpaOnlineZipformerSTT | SherpaOnlineNemotronSTT>();
 const sessions = new Map<string, StreamingTranscriptionSession>();
 let ipcClosing = false;
 
@@ -77,15 +87,31 @@ function sendToParent(message: VoiceViWorkerToParentMessage): void {
 }
 
 function sttEngineKey(config: VoiceViWorkerConfig): string {
-  return `${config.modelsDir}:${CODESWITCH_MODEL_ID}`;
+  return `${config.modelsDir}:${resolveActiveModelId()}`;
 }
 
-async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnlineZipformerSTT> {
+function activeModelId(): VoiceModelId {
+  return resolveActiveModelId();
+}
+
+async function getSttProvider(
+  config: VoiceViWorkerConfig,
+): Promise<SherpaOnlineZipformerSTT | SherpaOnlineNemotronSTT> {
   const key = sttEngineKey(config);
   const existing = sttProviders.get(key);
   if (existing) {
     return existing;
   }
+  if (activeModelId() === "nemotron") {
+    return getNemotronProvider(config);
+  }
+  return getCodeswitchProvider(config);
+}
+
+async function getCodeswitchProvider(
+  config: VoiceViWorkerConfig,
+): Promise<SherpaOnlineZipformerSTT> {
+  const key = sttEngineKey(config);
   const extraDirs = [bundledModelDir()];
   let resolved = resolveInstalledCodeswitchModelSync(config.modelsDir, extraDirs);
   if (!resolved) {
@@ -111,7 +137,42 @@ async function getSttProvider(config: VoiceViWorkerConfig): Promise<SherpaOnline
     sttEngines.set(engineKey, engine);
   }
   const created = new SherpaOnlineZipformerSTT(
-    { engine, defaultLanguage: config.dictationLanguage || "vi" },
+    { engine: engine as SherpaOnlineZipformerEngine, defaultLanguage: config.dictationLanguage || "vi" },
+    logger as never,
+  );
+  sttProviders.set(key, created);
+  return created;
+}
+
+async function getNemotronProvider(
+  config: VoiceViWorkerConfig,
+): Promise<SherpaOnlineNemotronSTT> {
+  const key = sttEngineKey(config);
+  let resolved = resolveInstalledNemotronModelSync(config.modelsDir);
+  if (!resolved) {
+    logger.info({ modelsDir: config.modelsDir }, "Nemotron model missing; downloading");
+    await ensureVietnameseDictationModel({ modelsDir: config.modelsDir, logger });
+    resolved = resolveInstalledNemotronModelSync(config.modelsDir);
+  }
+  const modelDir = resolved?.modelDir ?? getVietnameseDictationModelDirectory(config.modelsDir);
+  const engineKey = sttEngineKey(config);
+  let engine = sttEngines.get(engineKey);
+  if (!engine) {
+    engine = new SherpaOnlineNemotronEngine(
+      {
+        modelDir,
+        encoderPath: resolved?.encoderPath,
+        decoderPath: resolved?.decoderPath,
+        joinerPath: resolved?.joinerPath,
+        tokensPath: resolved?.tokensPath,
+        numThreads: 4,
+      },
+      logger as never,
+    );
+    sttEngines.set(engineKey, engine);
+  }
+  const created = new SherpaOnlineNemotronSTT(
+    { engine: engine as SherpaOnlineNemotronEngine, defaultLanguage: config.dictationLanguage || "vi" },
     logger as never,
   );
   sttProviders.set(key, created);

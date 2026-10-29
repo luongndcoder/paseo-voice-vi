@@ -135,6 +135,7 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
   );
 
   const modelOk = Boolean(status && status.modelInstalled && status.workerExists && status.sherpaInstalled);
+  const activeModel = status?.models.find((m) => m.id === status.activeModelId) ?? null;
   const testOk = status?.job?.kind === "self-test" && status.job.state === "succeeded";
   const configOk = Boolean(
     status?.dictation.enabled &&
@@ -174,9 +175,13 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
               <View style={styles.stepBody}>
                 <Text style={styles.stepTitle}>1. Speech model</Text>
                 <Text style={styles.muted}>
-                  {modelOk
-                    ? `${shortName(status.modelDirectory)} is ready.`
-                    : "The vi-en voice model was not found on this Mac."}
+                  {modelOk && activeModel
+                    ? `${activeModel.label} is ready.`
+                    : "The voice model was not found on this machine."}
+                </Text>
+                <Text style={styles.tiny}>
+                  Switch model: set PASEO_VOICE_VI_MODEL to “codeswitch” or “nemotron” in the
+                  daemon environment, then restart the daemon.
                 </Text>
                 {!modelOk ? (
                   <View style={{ marginTop: 8 }}>
@@ -306,7 +311,12 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
         {showDetails && status ? (
           <View style={styles.card}>
             <Text style={styles.tiny}>Worker: {status.workerPath ?? "not found"}</Text>
-            <Text style={styles.tiny}>Model: {status.modelDirectory}</Text>
+            {status.models.map((model) => (
+              <Text key={model.id} style={styles.tiny}>
+                {model.id === status.activeModelId ? "● " : "○ "}
+                {model.label}: {model.installed ? model.directory : "not downloaded"}
+              </Text>
+            ))}
             <Text style={styles.tiny}>Config: {status.configPath}</Text>
             <Text style={styles.code}>{status.configSnippet}</Text>
             <Pressable
