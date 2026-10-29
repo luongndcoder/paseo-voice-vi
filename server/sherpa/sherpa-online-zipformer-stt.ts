@@ -192,7 +192,6 @@ export class SherpaOnlineZipformerRealtimeSession
   private previousSegmentId: string | null = null;
   private bufferedChunks: Buffer[] = [];
   private bufferedBytes = 0;
-  private pendingCommits = 0;
 
   constructor(options: { engine: SherpaOnlineZipformerEngine; language?: string }) {
     super();
@@ -208,7 +207,6 @@ export class SherpaOnlineZipformerRealtimeSession
     this.currentSegmentId = uuidv4();
     this.bufferedChunks = [];
     this.bufferedBytes = 0;
-    this.pendingCommits = 0;
     this.connected = true;
   }
 
@@ -247,50 +245,29 @@ export class SherpaOnlineZipformerRealtimeSession
       this.bufferedChunks = [];
       this.bufferedBytes = 0;
 
-      if (audio.length === 0) {
-        const committedPayload: StreamingTranscriptionCommittedEvent = {
-          segmentId,
-          previousSegmentId,
-        };
-        const transcriptPayload: StreamingTranscriptionEvent = {
-          segmentId,
-          transcript: "",
-          isFinal: true,
-          language: this.language,
-          isLowConfidence: true,
-        };
-        this.emit("committed", committedPayload);
-        this.emit("transcript", transcriptPayload);
-        return;
+      // Synchronous decode: the daemon may close the session as soon as it
+      // sees our response, so the final must be emitted before commit()
+      // returns — never deferred to a later tick.
+      let transcript = "";
+      if (audio.length > 0) {
+        const float32 = pcm16leToFloat32(audio);
+        const result = this.engine.transcribeFloat32(float32, this.requiredSampleRate, this.language);
+        transcript = result.text;
       }
 
-      this.pendingCommits += 1;
-      const float32 = pcm16leToFloat32(audio);
-      // Offline decode can take a moment on long segments; run it off the
-      // IPC turn and emit the final when done. Segment rotation already
-      // happened, so later appends land in the fresh segment.
-      void Promise.resolve()
-        .then(() => this.engine.transcribeFloat32(float32, this.requiredSampleRate, this.language))
-        .then((result) => {
-          this.pendingCommits -= 1;
-          const committedPayload: StreamingTranscriptionCommittedEvent = {
-            segmentId,
-            previousSegmentId,
-          };
-          const transcriptPayload: StreamingTranscriptionEvent = {
-            segmentId,
-            transcript: result.text,
-            isFinal: true,
-            language: this.language,
-            ...(result.text.length === 0 ? { isLowConfidence: true } : {}),
-          };
-          this.emit("committed", committedPayload);
-          this.emit("transcript", transcriptPayload);
-        })
-        .catch((err: unknown) => {
-          this.pendingCommits -= 1;
-          this.emit("error", err instanceof Error ? err : new Error(String(err)));
-        });
+      const committedPayload: StreamingTranscriptionCommittedEvent = {
+        segmentId,
+        previousSegmentId,
+      };
+      const transcriptPayload: StreamingTranscriptionEvent = {
+        segmentId,
+        transcript,
+        isFinal: true,
+        language: this.language,
+        ...(transcript.length === 0 ? { isLowConfidence: true } : {}),
+      };
+      this.emit("committed", committedPayload);
+      this.emit("transcript", transcriptPayload);
     } catch (err) {
       this.emit("error", err instanceof Error ? err : new Error(String(err)));
     }
