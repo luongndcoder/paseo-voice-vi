@@ -36,14 +36,30 @@ function useStatus() {
     }, 3000);
     return () => clearInterval(timer);
   }, [status?.job?.state, refresh]);
-  return { status, error, loading, refresh, setStatus };
+  return { status, error, loading, refresh };
 }
 
-function Row({ label, value, ok }: { label: string; value: string; ok?: boolean }) {
+function shortName(path: string | null): string {
+  if (!path) return "Not found";
+  const parts = path.split("/").filter(Boolean);
+  return parts[parts.length - 1] ?? path;
+}
+
+function StepDot({ done, theme }: { done: boolean; theme: { colors: { statusSuccess: string; foregroundMuted: string } } }) {
   return (
-    <View style={{ flexDirection: "row", gap: 8, paddingVertical: 2 }}>
-      <Text style={{ flex: 1, opacity: 0.7 }}>{label}</Text>
-      <Text style={{ flex: 2, fontWeight: ok === false ? "600" : "400" }}>{value}</Text>
+    <View
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: done ? theme.colors.statusSuccess : "transparent",
+        borderWidth: done ? 0 : 2,
+        borderColor: done ? "transparent" : theme.colors.foregroundMuted,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {done ? <Text style={{ color: "#fff", fontSize: 13, fontWeight: "700" }}>✓</Text> : null}
     </View>
   );
 }
@@ -55,6 +71,7 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
   const startSelfTest = useRpc(selfTestRpc);
   const applyConfig = useRpc(applyConfigRpc);
   const [busy, setBusy] = useState<string | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
 
   const styles = {
     screen: {
@@ -66,27 +83,35 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
     title: { color: theme.colors.foreground, fontSize: layout.compact ? 20 : 24, fontWeight: "700" as const },
     body: { color: theme.colors.foreground, fontSize: 14 },
     muted: { color: theme.colors.foregroundMuted, fontSize: 13 },
-    card: {
+    tiny: { color: theme.colors.foregroundMuted, fontSize: 12 },
+    card: { backgroundColor: theme.colors.surface1, borderRadius: 12, padding: 14, gap: 8 as const },
+    heroReady: {
       backgroundColor: theme.colors.surface1,
-      borderRadius: 10,
-      padding: 12,
+      borderRadius: 12,
+      padding: 16,
       gap: 4 as const,
+      borderLeftWidth: 4 as const,
+      borderLeftColor: theme.colors.statusSuccess,
     },
-    button: {
-      padding: 12,
-      borderRadius: 10,
-      backgroundColor: theme.colors.accent,
+    heroTodo: {
+      backgroundColor: theme.colors.surface1,
+      borderRadius: 12,
+      padding: 16,
+      gap: 4 as const,
+      borderLeftWidth: 4 as const,
+      borderLeftColor: theme.colors.statusWarning,
     },
+    heroTitle: { color: theme.colors.foreground, fontSize: 17, fontWeight: "700" as const },
+    stepRow: { flexDirection: "row" as const, gap: 10 as const, alignItems: "flex-start" as const },
+    stepBody: { flex: 1 as const, gap: 2 as const },
+    stepTitle: { color: theme.colors.foreground, fontSize: 14, fontWeight: "600" as const },
+    button: { padding: 13, borderRadius: 10, backgroundColor: theme.colors.accent },
     buttonText: { color: theme.colors.accentForeground, textAlign: "center" as const, fontWeight: "600" as const },
-    secondaryButton: {
-      padding: 12,
-      borderRadius: 10,
-      backgroundColor: theme.colors.surface2,
-    },
+    secondaryButton: { padding: 12, borderRadius: 10, backgroundColor: theme.colors.surface2 },
     secondaryText: { color: theme.colors.foreground, textAlign: "center" as const, fontWeight: "600" as const },
     code: {
       color: theme.colors.foreground,
-      fontSize: 12,
+      fontSize: 11,
       fontFamily: "monospace" as const,
       backgroundColor: theme.colors.surface2,
       borderRadius: 8,
@@ -95,7 +120,7 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
   };
 
   const run = useCallback(
-    async (kind: "download" | "self-test" | "apply" | "copy", fn: () => Promise<unknown>) => {
+    async (kind: string, fn: () => Promise<unknown>) => {
       setBusy(kind);
       try {
         await fn();
@@ -109,137 +134,201 @@ export function VoiceViScreen({ theme, layout }: PluginScreenProps) {
     [refresh, toast],
   );
 
+  const modelOk = Boolean(status && status.modelInstalled && status.workerExists && status.sherpaInstalled);
+  const testOk = status?.job?.kind === "self-test" && status.job.state === "succeeded";
+  const configOk = Boolean(
+    status?.dictation.enabled &&
+      status.dictation.provider === "external" &&
+      status.dictation.commandMatchesWorker,
+  );
+  const ready = modelOk && testOk && configOk;
+  const jobRunning = status?.job?.state === "running";
+
   return (
     <ScrollView style={{ flex: 1, backgroundColor: theme.colors.surface0 }}>
       <View style={styles.screen}>
         <Text style={styles.title}>Vietnamese voice</Text>
         <Text style={styles.muted}>
-          On-device Vietnamese-English dictation (sherpa-onnx Zipformer codeswitch streaming).
-          This screen checks the
-          worker, downloads the model, self-tests the IPC protocol, and writes the daemon dictation
-          config.
+          Dictate Vietnamese and English on this Mac, offline. Text appears when you release the
+          microphone.
         </Text>
 
-        {error ? <Text style={{ color: theme.colors.statusDanger }}>Status failed: {error}</Text> : null}
-        {loading && !status ? <Text style={styles.muted}>Loading status…</Text> : null}
+        {error ? <Text style={{ color: theme.colors.statusDanger }}>Could not load status: {error}</Text> : null}
+        {loading && !status ? <Text style={styles.muted}>Checking setup…</Text> : null}
 
         {status ? (
-          <View style={{ gap: 12 }}>
-            <View style={styles.card}>
-              <Row label="Worker" value={status.workerPath ?? "not resolved"} ok={status.workerExists} />
-              <Row label="sherpa-onnx" value={status.sherpaInstalled ? "installed" : "missing"} ok={status.sherpaInstalled} />
-              <Row label="Model" value={status.modelInstalled ? status.modelDirectory : `missing (${status.modelsDir})`} ok={status.modelInstalled} />
-              <Row
-                label="Dictation"
-                value={
-                  status.dictation.provider
-                    ? `${status.dictation.enabled ? "enabled" : "disabled"} · ${status.dictation.provider} · ${status.dictation.language ?? "?"}`
-                    : "not configured"
-                }
-                ok={status.dictation.provider === "external" && status.dictation.commandMatchesWorker}
-              />
-              <Row label="Config" value={status.configPath} />
+          <View style={ready ? styles.heroReady : styles.heroTodo}>
+            <Text style={styles.heroTitle}>{ready ? "Ready to dictate" : "Setup needed"}</Text>
+            <Text style={styles.muted}>
+              {ready
+                ? "Press the microphone and speak. Vietnamese and English are both recognized."
+                : "Complete the steps below, then restart the Paseo daemon."}
+            </Text>
+          </View>
+        ) : null}
+
+        {status ? (
+          <View style={styles.card}>
+            <View style={styles.stepRow}>
+              <StepDot done={modelOk} theme={theme} />
+              <View style={styles.stepBody}>
+                <Text style={styles.stepTitle}>1. Speech model</Text>
+                <Text style={styles.muted}>
+                  {modelOk
+                    ? `${shortName(status.modelDirectory)} is ready.`
+                    : "The vi-en voice model was not found on this Mac."}
+                </Text>
+                {!modelOk ? (
+                  <View style={{ marginTop: 8 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Find the voice model"
+                      onPress={() =>
+                        void run("model", async () => {
+                          const result = await startDownload({});
+                          if (!result.started) toast.show("A task is already running.");
+                          else if (result.job.state === "failed") throw new Error(result.job.message);
+                        })
+                      }
+                      style={styles.button}
+                      disabled={busy !== null || jobRunning}
+                    >
+                      <Text style={styles.buttonText}>
+                        {busy === "model" || jobRunning ? "Working…" : "Find the voice model"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
             </View>
 
+            <View style={styles.stepRow}>
+              <StepDot done={testOk} theme={theme} />
+              <View style={styles.stepBody}>
+                <Text style={styles.stepTitle}>2. Microphone pipeline test</Text>
+                <Text style={styles.muted}>
+                  {testOk
+                    ? "Last test passed."
+                    : "Runs the voice engine once to make sure it works."}
+                </Text>
+                {!testOk ? (
+                  <View style={{ marginTop: 8 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Run the pipeline test"
+                      onPress={() =>
+                        void run("test", async () => {
+                          const result = await startSelfTest({});
+                          if (!result.started) toast.show("A task is already running.");
+                        })
+                      }
+                      style={modelOk ? styles.button : styles.secondaryButton}
+                      disabled={busy !== null || jobRunning || !modelOk}
+                    >
+                      <Text style={modelOk ? styles.buttonText : styles.secondaryText}>
+                        {busy === "test" || jobRunning ? "Working…" : "Run the test"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            <View style={styles.stepRow}>
+              <StepDot done={configOk} theme={theme} />
+              <View style={styles.stepBody}>
+                <Text style={styles.stepTitle}>3. Connect dictation</Text>
+                <Text style={styles.muted}>
+                  {configOk
+                    ? "Paseo is connected to the voice engine."
+                    : "Point Paseo dictation at the voice engine, then restart the daemon."}
+                </Text>
+                {!configOk ? (
+                  <View style={{ marginTop: 8 }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel="Connect dictation"
+                      onPress={() =>
+                        void run("apply", async () => {
+                          const result = await applyConfig({
+                            language: status?.dictation.language ?? "vi",
+                          });
+                          toast.show("Connected. Restart the Paseo daemon to finish.");
+                          void result;
+                        })
+                      }
+                      style={modelOk && testOk ? styles.button : styles.secondaryButton}
+                      disabled={busy !== null || jobRunning || !modelOk}
+                    >
+                      <Text style={modelOk && testOk ? styles.buttonText : styles.secondaryText}>
+                        {busy === "apply" ? "Working…" : "Connect dictation"}
+                      </Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+              </View>
+            </View>
+
+            {status.job && status.job.state !== "succeeded" ? (
+              <Text style={styles.muted}>
+                Last task ({status.job.kind === "download-model" ? "find model" : "pipeline test"}):{" "}
+                {status.job.state} — {status.job.message}
+              </Text>
+            ) : null}
             {status.warnings.length > 0 ? (
-              <View style={styles.card}>
-                <Text style={{ ...styles.body, fontWeight: "600" }}>Warnings</Text>
+              <View style={{ gap: 2 }}>
                 {status.warnings.map((warning) => (
-                  <Text key={warning} style={styles.muted}>
+                  <Text key={warning} style={styles.tiny}>
                     {"• "}
                     {warning}
                   </Text>
                 ))}
               </View>
             ) : null}
-
-            {status.job ? (
-              <View style={styles.card}>
-                <Text style={{ ...styles.body, fontWeight: "600" }}>
-                  {status.job.kind === "download-model" ? "Model download" : "Worker self-test"}: {status.job.state}
-                </Text>
-                <Text style={styles.muted}>{status.job.message}</Text>
-              </View>
-            ) : null}
-
-            <View style={styles.card}>
-              <Text style={{ ...styles.body, fontWeight: "600" }}>Config snippet</Text>
-              <Text style={styles.muted}>Applied by “Apply dictation config”. Restart the daemon after applying.</Text>
-              <Text style={styles.code}>{status.configSnippet}</Text>
-            </View>
           </View>
         ) : null}
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Refresh status"
-          onPress={() => void run("copy", async () => refresh())}
+          accessibilityLabel="Show technical details"
+          onPress={() => setShowDetails((value) => !value)}
           style={styles.secondaryButton}
-          disabled={busy !== null}
         >
-          <Text style={styles.secondaryText}>{busy ? "Working…" : "Refresh status"}</Text>
+          <Text style={styles.secondaryText}>
+            {showDetails ? "Hide technical details" : "Show technical details"}
+          </Text>
         </Pressable>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Download Vietnamese model"
-          onPress={() =>
-            void run("download", async () => {
-              const result = await startDownload({});
-              if (!result.started) toast.show("A job is already running.");
-            })
-          }
-          style={styles.button}
-          disabled={busy !== null}
-        >
-          <Text style={styles.buttonText}>Locate vi-en codeswitch model (~75 MB)</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Run worker self-test"
-          onPress={() =>
-            void run("self-test", async () => {
-              const result = await startSelfTest({});
-              if (!result.started) toast.show("A job is already running.");
-            })
-          }
-          style={styles.secondaryButton}
-          disabled={busy !== null}
-        >
-          <Text style={styles.secondaryText}>Run worker self-test</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Apply dictation config"
-          onPress={() =>
-            void run("apply", async () => {
-              const result = await applyConfig({ language: status?.dictation.language ?? "vi" });
-              toast.show(`Config written (backup: ${result.backupPath}). Restart the daemon.`);
-            })
-          }
-          style={styles.button}
-          disabled={busy !== null}
-        >
-          <Text style={styles.buttonText}>Apply dictation config</Text>
-        </Pressable>
-
-        {status ? (
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Copy config snippet"
-            onPress={() =>
-              void run("copy", async () => {
-                await copyText(status.configSnippet);
-                toast.show("Config snippet copied.");
-              })
-            }
-            style={styles.secondaryButton}
-            disabled={busy !== null}
-          >
-            <Text style={styles.secondaryText}>Copy config snippet</Text>
-          </Pressable>
+        {showDetails && status ? (
+          <View style={styles.card}>
+            <Text style={styles.tiny}>Worker: {status.workerPath ?? "not found"}</Text>
+            <Text style={styles.tiny}>Model: {status.modelDirectory}</Text>
+            <Text style={styles.tiny}>Config: {status.configPath}</Text>
+            <Text style={styles.code}>{status.configSnippet}</Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Copy config"
+              onPress={() =>
+                void run("copy", async () => {
+                  await copyText(status.configSnippet);
+                  toast.show("Config copied.");
+                })
+              }
+              style={styles.secondaryButton}
+              disabled={busy !== null}
+            >
+              <Text style={styles.secondaryText}>Copy config</Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Refresh status"
+              onPress={() => void run("refresh", refresh)}
+              style={styles.secondaryButton}
+              disabled={busy !== null}
+            >
+              <Text style={styles.secondaryText}>Refresh status</Text>
+            </Pressable>
+          </View>
         ) : null}
       </View>
     </ScrollView>
