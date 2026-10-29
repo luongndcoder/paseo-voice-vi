@@ -2,11 +2,11 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  ModelSelectionSchema,
   SELECTION_FILE_NAME,
   VOICE_MODEL_ENV,
+  parseModelSelection,
   type VoiceModelId,
-} from "../shared/contract.ts";
+} from "../shared/model.ts";
 
 export function selectionFilePath(paseoHome: string): string {
   return path.join(paseoHome, SELECTION_FILE_NAME);
@@ -17,8 +17,7 @@ export function readModelSelection(paseoHome: string): VoiceModelId | null {
   try {
     if (!existsSync(selectionFilePath(paseoHome))) return null;
     const parsed: unknown = JSON.parse(readFileSync(selectionFilePath(paseoHome), "utf8"));
-    const result = ModelSelectionSchema.safeParse(parsed);
-    return result.success ? result.data.model : null;
+    return parseModelSelection(parsed);
   } catch {
     return null;
   }

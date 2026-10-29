@@ -9,7 +9,7 @@ import {
 } from "./sherpa/codeswitch-model.ts";
 import { ensureVietnameseDictationModel } from "./sherpa/vietnamese-model.ts";
 import { resolveEffectiveModel, writeModelSelection } from "./selection.ts";
-import type { VoiceModelId } from "../shared/contract.ts";
+import type { VoiceModelId } from "../shared/model.ts";
 import {
   readDaemonConfig,
   resolveConfigPath,

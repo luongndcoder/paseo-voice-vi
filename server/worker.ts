@@ -31,7 +31,7 @@ import {
   getVietnameseDictationModelDirectory,
   resolveInstalledNemotronModelSync,
 } from "./sherpa/vietnamese-model.ts";
-import type { VoiceModelId } from "../shared/contract.ts";
+import type { VoiceModelId } from "../shared/model.ts";
 import { resolveEffectiveModel, resolvePaseoHomeDir } from "./selection.ts";
 import { workerBytesToBuffer } from "./worker-bytes.ts";
 

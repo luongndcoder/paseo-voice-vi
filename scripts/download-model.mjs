@@ -5,7 +5,7 @@
 import os from "node:os";
 import path from "node:path";
 import { logger } from "../server/logger.ts";
-import { resolveActiveModelId } from "../shared/contract.ts";
+import { resolveActiveModelId } from "../shared/model.ts";
 import {
   CODESWITCH_MODEL_ID,
   ensureCodeswitchModel,

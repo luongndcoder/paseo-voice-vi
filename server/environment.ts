@@ -4,11 +4,10 @@ import path from "node:path";
 import {
   MODEL_ID,
   PLUGIN_ID,
-  VOICE_MODEL_ENV,
   WORKER_FILE_NAME,
-  voiceModelLabel,
   type Status,
 } from "../shared/contract";
+import { VOICE_MODEL_ENV, voiceModelLabel } from "../shared/model";
 import { resolveEffectiveModel } from "./selection";
 import { jobSnapshot } from "./jobs";
 import {
